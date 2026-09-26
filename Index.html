@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>منصة الحضور والغياب</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f5f5dc; margin: 0; padding: 0; color: #103c68; }
+        .navbar { background-color: #103c68; padding: 15px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;}
+        .navbar button { background-color: #d4af37; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; color: #103c68; font-size: 15px; transition: 0.3s; }
+        .navbar button:hover { background-color: white; }
+        .container { max-width: 95%; margin: 30px auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 6px solid #d4af37; }
+        .hidden { display: none; }
+        
+        select, button.submit-btn { width: 100%; max-width: 400px; padding: 12px; margin: 10px auto; display: block; border: 1px solid #103c68; border-radius: 6px; font-size: 16px; box-sizing: border-box; outline: none; }
+        select:focus { border-color: #d4af37; }
+        button.submit-btn { background-color: #103c68; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button.submit-btn:hover { background-color: #cb4154; }
+        #msg { font-weight: bold; margin-top: 15px; text-align: center; font-size: 18px; }
+        
+        /* تنسيق جدول المراقبة */
+        .table-wrapper { overflow-x: auto; margin-top: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; border-left: 1px solid #eee; white-space: nowrap; }
+        th { background-color: #103c68; color: white; position: sticky; top: 0; }
+        tr:hover { background-color: #f9f9f9; }
+        td:nth-child(3) { text-align: right; font-weight: bold; } /* تنسيق اسم الطالبة */
+    </style>
+</head>
+<body>
+
+    <!-- شريط التنقل العلوي -->
+    <div class="navbar">
+        <button onclick="showSection('attendanceSection')">تسجيل الحضور للطالبات</button>
+        <button onclick="showSection('dashboardSection'); loadDashboard();">لوحة المراقبة (خاص بالأستاذة)</button>
+    </div>
+
+    <!-- 1. واجهة الطالبات -->
+    <div id="attendanceSection" class="container" style="max-width: 500px;">
+        <h2 style="text-align: center; color: #103c68;">تسجيل الحضور</h2>
+        <select id="course" onchange="updateSections()">
+            <option value="">1- اختاري المقرر...</option>
+            <option value="HCI2011">HCI2011</option>
+            <option value="CS2105">CS2105</option>
+        </select>
+        
+        <select id="section" onchange="updateStudents()" disabled>
+            <option value="">2- اختاري الشعبة...</option>
+        </select>
+        
+        <select id="student" disabled>
+            <option value="">3- اختاري اسمك...</option>
+        </select>
+        
+        <button class="submit-btn" onclick="submitAttendance()">تأكيد الحضور</button>
+        <div id="msg"></div>
+    </div>
+
+    <!-- 2. واجهة الداشبورد (لوحة المراقبة) -->
+    <div id="dashboardSection" class="container hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <h2 style="color: #103c68; margin: 0;">كشف الحضور المجمع (Matrix)</h2>
+            <button onclick="loadDashboard()" style="padding:10px 20px; background:#cb4154; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">تحديث الكشف</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead id="table-head">
+                    <tr><th>جاري تحميل العناوين...</th></tr>
+                </thead>
+                <tbody id="table-body">
+                    <tr><td style="text-align:center;">جاري سحب البيانات...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        
+        // جلب قائمة الطالبات فور فتح الصفحة
+        google.script.run.withSuccessHandler(function(data) {
+            allData = data;
+        }).getStudentsList();
+
+        function showSection(sectionId) {
+            document.getElementById('attendanceSection').classList.add('hidden');
+            document.getElementById('dashboardSection').classList.add('hidden');
+            document.getElementById(sectionId).classList.remove('hidden');
+        }
+
+        function updateSections() {
+            const course = document.getElementById('course').value;
+            const secSel = document.getElementById('section');
+            const stuSel = document.getElementById('student');
+            
+            secSel.innerHTML = '<option value="">2- اختاري الشعبة...</option>';
+            stuSel.innerHTML = '<option value="">3- اختاري اسمك...</option>';
+            secSel.disabled = true; stuSel.disabled = true;
+            
+            if(!course) return;
+            const sections = [...new Set(allData.filter(r => r[0] == course).map(r => r[1]))];
+            sections.forEach(s => secSel.innerHTML += `<option value="${s}">${s}</option>`);
+            secSel.disabled = false;
+        }
+
+        function updateStudents() {
+            const course = document.getElementById('course').value;
+            const section = document.getElementById('section').value;
+            const stuSel = document.getElementById('student');
+            
+            stuSel.innerHTML = '<option value="">3- اختاري اسمك...</option>';
+            stuSel.disabled = true;
+            
+            if(!section) return;
+            const students = allData.filter(r => r[0] == course && r[1] == section).map(r => r[2]);
+            students.forEach(s => stuSel.innerHTML += `<option value="${s}">${s}</option>`);
+            stuSel.disabled = false;
+        }
+
+        function submitAttendance() {
+            const c = document.getElementById('course').value;
+            const s = document.getElementById('section').value;
+            const n = document.getElementById('student').value;
+            
+            if(!c || !s || !n) { 
+                document.getElementById('msg').innerText = "الرجاء تعبئة جميع الخانات!";
+                document.getElementById('msg').style.color = "#cb4154";
+                return; 
+            }
+            
+            document.getElementById('msg').innerText = "جاري تحضيرك...";
+            document.getElementById('msg').style.color = "#103c68";
+
+            google.script.run.withSuccessHandler(function(res) {
+                document.getElementById('msg').innerText = res;
+                document.getElementById('msg').style.color = "#008000";
+                document.getElementById('student').value = ''; 
+            }).recordAttendance(c, s, n);
+        }
+
+        function loadDashboard() {
+            document.getElementById('table-body').innerHTML = '<tr><td style="text-align:center;">جاري سحب البيانات...</td></tr>';
+            google.script.run.withSuccessHandler(function(data) {
+                const thead = document.getElementById('table-head');
+                const tbody = document.getElementById('table-body');
+                thead.innerHTML = ''; tbody.innerHTML = '';
+                
+                if(data.length === 0 || data[0].length === 0) { 
+                    tbody.innerHTML = '<tr><td style="text-align:center;">لم يتم تسجيل أي حضور بعد.</td></tr>'; 
+                    return; 
+                }
+                
+                // بناء العناوين (المقرر، الشعبة، الاسم، التواريخ...)
+                let headRow = '<tr>';
+                data[0].forEach(header => {
+                    headRow += `<th>${header}</th>`;
+                });
+                headRow += '</tr>';
+                thead.innerHTML = headRow;
+                
+                // بناء صفوف الطالبات ووضع علامة الحضور
+                for(let i = 1; i < data.length; i++) {
+                    let tr = '<tr>';
+                    data[i].forEach((cell, index) => {
+                        // تلوين علامة الصح بالأخضر إن وجدت
+                        if(index > 2 && cell.includes('حاضرة')) {
+                            tr += `<td style="color: #008000; font-weight:bold;">${cell}</td>`;
+                        } else {
+                            tr += `<td>${cell || '-'}</td>`; // وضع شرطة للأيام الغائبة
+                        }
+                    });
+                    tr += '</tr>';
+                    tbody.innerHTML += tr;
+                }
+            }).getAttendanceMatrix();
+        }
+    </script>
+</body>
+</html>
